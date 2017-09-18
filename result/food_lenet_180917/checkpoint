@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/kum/project/ML/kai-tf/result/food_lenet_180917/model.test"
+all_model_checkpoint_paths: "/home/kum/project/ML/kai-tf/result/food_lenet_180917/model.test"

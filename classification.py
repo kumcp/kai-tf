@@ -2,7 +2,7 @@ from readerwriter import KReaderWriter
 import tensorflow as tf
 import numpy as np
 import os.path
-import re
+
 import math
 import time
 from datetime import datetime
@@ -184,72 +184,18 @@ class KClassification(object):
         # images = tf.train.batch([self.image_input],batch_size=1)
         images = tf.expand_dims(self.image_input,0)
         self.BATCH_SIZE = 1
-        self.logit = self.model(images)
+        self.logit = self.model(images,is_training=False)
         self.restore_session()
 
-    def model(self,images,reuse=None):
-        TOWER_NAME = 'tower'
-
-        conv1_node = 30
-        conv1_shape = [5,5,3,conv1_node]
-        
-        conv2_node = 20
-        conv2_shape = [5,5,conv1_node,conv2_node]
-
-        conv3_node = 20
-        conv3_shape = [5,5,conv2_node,conv3_node]
-
+    def model(self,images,reuse=None,is_training=True):
+        raise NotImplementedError("You have to define your own model in your inherited class")
         
 
-        local4_node = 30
-        local5_node = 15
-
-        initializer = tf.truncated_normal_initializer(mean=0.0,stddev=0.1)
-
-        conv1 = self.conv_layer(images,shape=conv1_shape,num_filter=conv1_node,initializer=initializer,
-                                        name='conv1')
-        pool1 = tf.nn.max_pool(conv1, ksize=[1,3,3,1], strides=[1,2,2,1],padding='SAME', name='pool1')
-        norm1 = tf.nn.lrn(pool1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,name='norm1')
-
-        conv2 = self.conv_layer(norm1,shape=conv2_shape,num_filter=conv2_node,initializer=initializer,
-                                        name='conv2')
-        pool2 = tf.nn.max_pool(conv2, ksize=[1,3,3,1], strides=[1,2,2,1],padding='SAME', name='pool2')
-        norm2 = tf.nn.lrn(pool2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,name='norm2')
-
-        conv3 = self.conv_layer(norm2,shape=conv3_shape,num_filter=conv3_node,initializer=initializer,
-                                        name='conv3')
-        pool3 = tf.nn.max_pool(conv3, ksize=[1,3,3,1], strides=[1,2,2,1],padding='SAME', name='pool3')
-        norm3 = tf.nn.lrn(pool2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,name='norm3')
-
-        normX3 = tf.add(norm3,norm2)
-
-        fc3 = self.fc_layer(normX3,shape=[local4_node],num_node=local4_node,initializer=initializer,
-                                bias_initializer=initializer,wd=4e-5,
-                                name='fc3',reshape=True)
-        
-        fc4 = self.fc_layer(fc3,shape=[local4_node,local5_node],num_node=local5_node,initializer=initializer,
-                                bias_initializer=initializer,wd=4e-4,
-                                name='fc4')
-
-        softmax_linear = self.fc_layer(fc4,shape=[local5_node, self.NUM_CLASSES],num_node=self.NUM_CLASSES,
-                                            initializer=tf.truncated_normal_initializer(stddev=1/192.0),
-                                            bias_initializer=tf.constant_initializer(0.1),wd=4e-3,
-                                            name='softmax_linear',
-                                            relu=False)
-       
-        return softmax_linear
-        
-
-    def summary(self,x):
-        TOWER_NAME = 'tower'
-        tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
-        tf.summary.histogram(tensor_name + '/activations', x)
-        tf.summary.scalar(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
-
+    
     def save_session(self,path=''):
         saver = tf.train.Saver()
         if path=='':
-            path = os.path.dirname(os.path.realpath(__file__)) + "/model.test"
+            path = os.path.dirname(os.path.realpath(__file__)) + "/result/"+self.model_name+"/model.test"
         saver.save(self.sess,path)
         print("Model saved to: %s" % path)
         with open('num_run.txt', 'w') as myfile:
@@ -263,7 +209,7 @@ class KClassification(object):
         saver = tf.train.Saver()
 
         if path=='':
-            path = os.path.dirname(os.path.realpath(__file__)) + "/model.test"
+            path = os.path.dirname(os.path.realpath(__file__)) + "/result/"+self.model_name+ "/model.test"
         if os.path.isfile(path+".index") and not force_start:
             saver.restore(self.sess,path)
             print("Loaded model from: %s" % path)
@@ -289,7 +235,7 @@ class KClassification(object):
             eval_dir = self.data_dir
 
         images, labels = self.read_data(eval_dir)
-        logits = self.model(images)
+        logits = self.model(images,is_training=False)
         
         top_k_op = tf.nn.in_top_k(logits, labels, 1)
 
@@ -349,58 +295,6 @@ class KClassification(object):
         self.coord.join(threads, stop_grace_period_secs=10)
 
 
-    def conv_layer(self,inputs,shape,num_filter,initializer,bias_initializer=tf.constant_initializer(0.0),strides=[1,1,1,1],padding='SAME',wd=0.0,name='conv',reuse=None):
-        
-        with tf.variable_scope(name,reuse=reuse) as scope:
-            initializer = tf.truncated_normal_initializer(stddev=1e-1)
-
-            with tf.device('/cpu:0'):
-                # shape=[5, 5, 3, conv1_node]
-                kernel = tf.get_variable('weights', shape, initializer=initializer)
-                
-                weight_decay = tf.multiply(tf.nn.l2_loss(kernel), wd, name='weight_loss')
-                tf.add_to_collection('losses', weight_decay)
-                biases = tf.get_variable('biases', shape=[num_filter],initializer=bias_initializer)
-
-            conv = tf.nn.conv2d(inputs, kernel, strides, padding=padding)
-
-            pre_activation = tf.nn.bias_add(conv, biases)
-            conv_output = tf.nn.relu(pre_activation, name=scope.name)
-
-            # Export to histogram.
-            self.summary(conv_output)
-            return conv_output
-
-    def fc_layer(self,inputs,shape,num_node,initializer,bias_initializer=tf.constant_initializer(0.1),wd=0.0,name='fc',reuse=None,reshape=False,relu=True):
-        
-        with tf.variable_scope(name,reuse=reuse) as scope:
-            if reshape:
-                reshape_inputs = tf.reshape(inputs, [self.BATCH_SIZE, -1])
-                dim = reshape_inputs.get_shape()[1].value
-                shape=[dim, num_node]
-            else:
-                reshape_inputs = inputs
-            
-            with tf.device('/cpu:0'):
-                
-                weights = tf.get_variable('weights', shape, initializer=initializer)
-            
-                weight_decay = tf.multiply(tf.nn.l2_loss(weights), wd, name='weight_loss')
-                tf.add_to_collection('losses', weight_decay)
-                biases = tf.get_variable('biases',[num_node],initializer=bias_initializer)
-
-            
-            if relu:
-                pre = tf.add(tf.matmul(reshape_inputs, weights), biases)
-                fc_output = tf.nn.relu(pre,name=scope.name)
-            else:
-                fc_output = tf.add(tf.matmul(reshape_inputs, weights), biases,name=scope.name)
-
-            self.summary(fc_output)
-
-            return fc_output
-
-            
 
 class _LoggerHook(tf.train.SessionRunHook):
     """Logs loss and runtime."""
