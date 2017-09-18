@@ -1,0 +1,14 @@
+Conv1: 5x5x30
+Conv2: 5x5x20
+FC3: 30
+FC4: 15
+FC5: 7
+
+Use regularization:
+FC3: 0.00004
+FC4: 0.0004
+FC5: 0.004
+---------------
+Train: 99% 
+Test: 25%
+
