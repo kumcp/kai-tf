@@ -14,12 +14,12 @@ class K7FoodClassification(KClassification):
         self.num_test = 30000
         self.force_start = False
         self.sess = tf.InteractiveSession()
-        self.num_run = 5000
-        self.ini_lr = 0.02
+        self.num_run = 10000
+        self.ini_lr = 0.01
         self.decay_rate = 0.99
         self.decay_step = 100000
         self.crop_size=[80,80]
-        self.model_name = "food_lenet_180917"
+        self.model_name = "food_res_190917"
         self.eval_log_dir = "./log/"+self.model_name
 
     def set_batch_size(self,batch_size):
@@ -29,21 +29,21 @@ class K7FoodClassification(KClassification):
     def model(self,images,reuse=None,is_training=True):
         TOWER_NAME = 'tower'
 
-        conv1_node = 30
+        conv1_node = 32
         conv1_shape = [5,5,3,conv1_node]
         
-        conv2_node = 20
+        conv2_node = 64
         conv2_shape = [5,5,conv1_node,conv2_node]
 
-        conv3a_node = 15
+        conv3a_node = 64
         conv3_input_shape = [5,5,conv2_node,conv3a_node]
 
-        conv3b_node = 30
+        conv3b_node = 128
         conv3_output_shape = [5,5,conv2_node,conv3b_node]
         
 
-        local4_node = 30
-        local5_node = 15
+        local4_node = 100
+        local5_node = 50
 
         initializer = tf.truncated_normal_initializer(mean=0.0,stddev=0.1)
 

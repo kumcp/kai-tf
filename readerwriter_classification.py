@@ -51,6 +51,16 @@ class KReaderWriter(object):
         return result
 
     def convert_real_image_to_tfrecord(self,path,export_dir='',get_loop=True):
+        """
+        Convert real image to tfrecord as specific input.
+        Args:
+            path: path to image file. 
+                Each class should be devided into a folder,
+                and that folder contains images of that class.
+            export_dir: path to tfrecord file.
+            get_loop: get loop with different number of class
+            
+        """
         self.path = path
         if export_dir == '':
             export_dir = path+"/../export/"
