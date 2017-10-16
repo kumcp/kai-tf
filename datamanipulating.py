@@ -73,3 +73,20 @@ class KDataManipulating(object):
     @staticmethod
     def standardize(input):
         return tf.image.per_image_standardization(input)
+
+
+    @staticmethod
+    def normalize(input,original_minval, original_maxval, target_minval,
+                    target_maxval):
+        with tf.name_scope('NormalizeImage', values=[input]):
+            original_minval = float(original_minval)
+            original_maxval = float(original_maxval)
+            target_minval = float(target_minval)
+            target_maxval = float(target_maxval)
+            image = tf.to_float(image)
+            image = tf.subtract(image, original_minval)
+            image = tf.multiply(image, (target_maxval - target_minval) /
+                                (original_maxval - original_minval))
+            image = tf.add(image, target_minval)
+            return image
+    
